@@ -1,127 +1,306 @@
-import os.path as os
-from copy import deepcopy
+"""
+Go Playing AI Agent - A Sophisticated 5x5 Go Game AI
 
+This program implements an intelligent Go (Weiqi/Baduk) playing agent designed for 5x5 boards.
+The AI uses the minimax algorithm with alpha-beta pruning to play competitively against human 
+players or other AI agents.
+
+GAME OVERVIEW:
+Go is an ancient strategic board game where two players (Black and White) alternately place
+stones on intersections of a grid to control territory. The player who controls more territory
+at the end wins.
+
+KEY GO RULES IMPLEMENTED:
+1. CAPTURING: Stones with no liberties (empty adjacent spaces) are captured and removed
+2. KO RULE  : You cannot immediately recapture a single stone that just captured your stone
+3. SUICIDE  : You cannot place a stone that would have no liberties (unless it captures)
+4. TERRITORY: Empty spaces surrounded by your stones count as your territory, but is not scored
+5. KOMI     : White gets bonus points (2.5) to compensate for Black playing first
+
+GAME CONSTRAINTS:
+- Board Size    : 5x5 (25 intersections)
+- Maximum Moves : 24 total (12 per player)
+- Time Limit    : Must make moves quickly
+- Input/Output  : Reads from input.txt, step.txt and writes to output.txt
+
+AI STRATEGY:
+1. OPENING: Plays center or near-center for maximum influence
+2. MIDGAME: Uses minimax with board evaluation for tactical play
+3. ENDGAME: Focuses on territory counting and secure positions
+
+ALGORITHM COMPONENTS:
+- Minimax Algorithm: Looks ahead several moves to find best play
+- Alpha-Beta Pruning: Optimizes search by eliminating bad branches
+- Board Evaluation: Sophisticated scoring considering multiple factors
+- Game Phase Detection: Adjusts strategy based on move number
+- Heuristic Functions: Evaluates stone shapes, liberty, territory, etc.
+"""
+
+# ============================================================================
+# IMPORTS AND SETUP
+# ============================================================================
+
+# import pstats             # Profiling imports for identifying bottlenecks
 # import cProfile
-# import pstats
+import os.path as os        # For file path operations
+from copy import deepcopy   # For creating deep copies of game boards
 
+# Get the directory where this script is located (for file operations)
 baseLocation = os.dirname(os.abspath(__file__))
 
+# File path for storing the current step/move number
 STEP_FILE = os.join(baseLocation, 'step.txt')
 
-BOARD_SIZE = 5
-EMPTY = 0
-BLACK = 1
-WHITE = 2
-KOMI = 2.5
 
-friendlyPieceVal = 1
-opposingPieceVal = 1
+# ============================================================================
+# GAME CONSTANTS - Core Go Game Rules and Settings
+# ============================================================================
 
-step = 4 # Intialising in case of errors
+BOARD_SIZE = 5              # 5x5 board (25 intersections total)
+EMPTY = 0                   # Empty intersection (no stone placed)
+BLACK = 1                   # Black stone/player (plays first)
+WHITE = 2                   # White stone/player (plays second)
+KOMI = 2.5                  # Points given to White to compensate for playing second
 
-minimaxDepth = 3
-midGameStep = 9 # Step at which we transition to midgame
-endGameStep = 19 # Step at which we transition to endgame
 
-maxStepNumber = 24
+# ============================================================================
+# AI STRATEGY CONSTANTS - Control AI behavior and strength
+# ============================================================================
+
+friendlyPieceVal = 1        # Base value for our own stones
+opposingPieceVal = 1        # Base penalty for opponent stones
+
+step = 4                    # Current move number (initialized for error handling)
+
+minimaxDepth = 3            # How many moves ahead the AI looks (deeper = stronger but slower)
+midGameStep = 9             # Move number when middle game begins
+endGameStep = 19            # Move number when end game begins (territory counting focus)
+
+maxStepNumber = 24          # Maximum possible moves in the game
+
+
+
+# ============================================================================
+# DIRECTION VECTORS - For checking adjacent positions on the board
+# ============================================================================
+
+# Cardinal directions: up, down, left, right (for checking liberties and captures)
 CARDINALDIRECTIONS = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+
+# All 8 surrounding directions (cardinal + diagonal) - for territory and influence
 surroundingDirections = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (-1, -1), (1, -1), (-1, 1)]
 
+# Forward directions for shape analysis (helps evaluate stone connections from corners and otherwise)
 forwardNearbyStones = [(0, 1), (1, 0), (1, 1)]
 forwardDiagonalStones = [(1, 1), (1, -1)]
 
+# ============================================================================
+# BOARD POSITION MANAGEMENT
+# ============================================================================
+
+# All possible positions on a 5x5 board (row, column) - for iterating through board
 indices = [(0,0), (0,1), (0,2), (0,3), (0,4), 
             (1,0), (1,1), (1,2), (1,3), (1,4), 
             (2,0), (2,1), (2,2), (2,3), (2,4), 
             (3,0), (3,1), (3,2), (3,3), (3,4), 
             (4,0), (4,1), (4,2), (4,3), (4,4)]
 
-centralTerm = set([1, 2, 3])
-edgeTerms = set([0, 4])
+# Position classification for strategic evaluation
+centralTerm = set([1, 2, 3])                # Central rows/columns (more valuable positions)
+edgeTerms = set([0, 4])                     # Edge rows/columns (less valuable, harder to defend)
 
+# Move priority order: try center first, then expand outward (best-first search optimization)
 usefulIndices = [
-    (2,2), (2,1), (2,3), (1,2), (3,2),
-    (1,1), (1,3), (3,1), (3,3), (0,2), 
-    (4,2), (4,1), (4,3), (0,1), (0,3),
-    (2,0), (2,4), (1,0), (3,0), (1,4),
-    (3,4), (0,0), (4,0), (0,4), (4,4)
+    (2,2), (2,1), (2,3), (1,2), (3,2),      # Center and immediate neighbors
+    (1,1), (1,3), (3,1), (3,3), (0,2),      # Secondary center positions  
+    (4,2), (4,1), (4,3), (0,1), (0,3),      # Extending toward edges
+    (2,0), (2,4), (1,0), (3,0), (1,4),      # Edge positions
+    (3,4), (0,0), (4,0), (0,4), (4,4)       # Corner positions (lowest priority)
 ]
 
+# ============================================================================
+# POSITIONAL HEURISTICS - Strategic value tables for different game phases
+# ============================================================================
+
+# OPENING GAME: Emphasize center control and influence
+# Higher values = more desirable positions to play
 positionalHeuristics = [
-    [0.1, 0.2, 0.2, 0.2, 0.1],
-    [0.2, 0.25, 0.25, 0.2, 0.15],
-    [0.2, 0.25, 0.3, 0.2, 0.15],
-    [0.2, 0.25, 0.2, 0.2, 0.15],
-    [0.1, 0.15, 0.15, 0.15, 0.1]
+    [0.1, 0.2, 0.2, 0.2, 0.1],              # Top row: edges less valuable
+    [0.2, 0.25, 0.25, 0.2, 0.15],           # Second row: good but not center
+    [0.2, 0.25, 0.3, 0.2, 0.15],            # Middle row: center (2,2) most valuable
+    [0.2, 0.25, 0.2, 0.2, 0.15],            # Fourth row: symmetric to second
+    [0.1, 0.15, 0.15, 0.15, 0.1]            # Bottom row: edges least valuable
 ]
 
+# MIDDLE GAME: Maintain center focus but reduce edge penalties
 midgameHeuristics = [
-    [0.1, 0.1, 0.1, 0.1, 0],
-    [0.1, 0.2, 0.2, 0.2, 0.1],
-    [0.1, 0.2, 0.3, 0.2, 0.1],
-    [0.1, 0.2, 0.2, 0.2, 0.1],
-    [0.1, 0.1, 0.1, 0.1, 0]
+    [0.1, 0.1, 0.1, 0.1, 0],                # Avoid top-right corner specifically
+    [0.1, 0.2, 0.2, 0.2, 0.1],              # Consistent value across
+    [0.1, 0.2, 0.3, 0.2, 0.1],              # Still prefer center
+    [0.1, 0.2, 0.2, 0.2, 0.1],              # Symmetric play
+    [0.1, 0.1, 0.1, 0.1, 0]                 # Avoid bottom-right corner
 ]
 
+# END GAME: All positions equal - focus on stone count and captures only
 endgameHeuristics = [
-    [0.0, 0.0, 0.0, 0.0, 0.0],
-    [0.0, 0.0, 0.0, 0.0, 0.0],
-    [0.0, 0.0, 0.0, 0.0, 0.0],
-    [0.0, 0.0, 0.0, 0.0, 0.0],
-    [0.0, 0.0, 0.0, 0.0, 0.0]
+    [0.0, 0.0, 0.0, 0.0, 0.0],              # No positional preference
+    [0.0, 0.0, 0.0, 0.0, 0.0],              # Pure tactical evaluation
+    [0.0, 0.0, 0.0, 0.0, 0.0],              # Territory counting dominates
+    [0.0, 0.0, 0.0, 0.0, 0.0],              # No strategic biases
+    [0.0, 0.0, 0.0, 0.0, 0.0]               # Let minimax handle everything
 ]
+
+# ============================================================================
+# INPUT/OUTPUT FUNCTIONS - File handling for game communication
+# ============================================================================
 
 def readInput(n, file="input.txt"):
+    """
+    Reads the current game state from an input file.
+    
+    The input file format is:
+    Line 1      : Player color (1 for Black, 2 for White)
+    Lines 2-6   : Previous board state (5x5 grid of numbers)
+    Lines 7-11  : Current board state (5x5 grid of numbers)
+    
+    Each board position contains:
+    0 = Empty intersection
+    1 = Black stone
+    2 = White stone
+    
+    Args:
+        n (int)     : Board size (should be 5 for our 5x5 game)
+        file (str)  : Name of input file (default: "input.txt")
+    
+    Returns:
+        tuple: (playerColor, olderBoard, ongoingBoard)
+        - playerColor (int)     : 1 for Black, 2 for White
+        - olderBoard (list)     : 5x5 list representing previous game state
+        - ongoingBoard (list)   : 5x5 list representing current game state
+    
+    Example:
+        If input.txt contains:
+        1
+        00000
+        00000
+        00100
+        00000
+        00000
+        00000
+        00000
+        00120
+        00000
+        00000
+        
+        This means: Black to play, previous board had Black stone at (2,2),
+        current board has Black at (2,2) and White at (2,3)
+    """
     path = os.join(baseLocation, file)
     with open(path, 'r') as f:
         lines = f.readlines()
 
+        # Read player color from first line
         playerColor = int(lines[0])
 
+        # Read previous board state (lines 1 to n)
         olderBoard = [[int(x) for x in line.rstrip('\n')] for line in lines[1:n+1]]
+        
+        # Read current board state (lines n+1 to 2n)
         ongoingBoard = [[int(x) for x in line.rstrip('\n')] for line in lines[n+1: 2*n+1]]
 
         return playerColor, olderBoard, ongoingBoard
 
-
 def writeOutput(result, file="output.txt"):
+    """
+    Writes the AI's chosen move to an output file.
+    
+    The output format is either:
+    - "PASS" if no good move is available
+    - "row,column" for the chosen move (e.g., "2,3" for row 2, column 3)
+    
+    Args:
+        result      : Either the string "PASS" or a tuple (row, col) representing the move
+        file (str)  : Name of output file (default: "output.txt")
+    
+    Examples:
+        writeOutput("PASS") -> writes "PASS" to output.txt
+        writeOutput((2, 3)) -> writes "2,3" to output.txt
+    """
     path = os.join(baseLocation, file)
     with open(path, 'w') as f:
         if result == "PASS":
             f.write("PASS")
         else:
+            # Convert move tuple to comma-separated string
             res = f"{result[0]},{result[1]}"
             f.write(res)
 
 def getStepNumber(playerColor, previousBoard, currentBoard):
+    """
+    Determines the current move number in the game.
+    
+    This function tracks game progress by:
+    1. Checking if step.txt exists (contains move counter)
+    2. If not, determines if this is move 1 or 2 based on board state
+    3. Updates the step file with next move number
+    
+    Move numbering:
+    - Move 1: First Black stone
+    - Move 2: First White stone  
+    - Move 3: Second Black stone
+    - etc.
+    
+    Args:
+        playerColor (int)   : Current player (1=Black, 2=White)
+        previousBoard (list): Previous board state (5x5)
+        currentBoard (list) : Current board state (5x5)
+    
+    Returns:
+        int: Current move number (1-24)
+        
+    Note:
+        This function has side effects - it reads and writes to step.txt
+        to maintain game state between moves. If step does not exist after 2 moves
+        have passed, it will malfunction in the count
+    """
     if not os.exists(STEP_FILE):
+        # First move of the game - create step file
         with open(STEP_FILE, 'w') as f:
-            f.write(str(playerColor+2))
+            f.write(str(playerColor+2))  # Write 3 for Black's first move, 4 for White's
         return playerColor
     else:
-        secondMove = False
-        firstMove = False
+        # Game is in progress - determine current move number
+        secondMove = False  # Has the second move been made?
+        firstMove = False   # Has the first move been made?
 
+        # Check if there are any stones on previous board (indicating moves have been made)
         for i, j in indices:
             if previousBoard[i][j] != EMPTY:
-                secondMove = True
+                secondMove = True  # At least one move has been made previously
                 break
             elif currentBoard[i][j] != EMPTY:
-                firstMove = True
+                firstMove = True   # Current board has moves but previous doesn't
 
         if secondMove:
+            # Game has been going on - read step number from file
             with open(STEP_FILE, 'r') as f:
                 step = int(f.readline())
         else:
+            # Early game - determine move number based on board state
             if firstMove:
-                step = 2
+                step = 2  # Second move of game (first White move)
             else:
-                step = 1
+                step = 1  # First move of game (first Black move)
 
+        # Update step file with next move number (increment by 2 since it alternates players)
         with open(STEP_FILE, 'w') as f:
                 f.write(str(step+2))   
 
         return step
+
+# ============================================================================
+# CORE GO GAME LOGIC - Liberty, Capture, and Rule Checking
+# ============================================================================
 
 def checkLiberty(board, x, y):
     '''Find if the stone placed at x,y has a liberty.
