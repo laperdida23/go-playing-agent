@@ -1,0 +1,83 @@
+commit_tags:
+  core_development:
+    feature_development:
+      - tag: "[FEAT]"
+        description: New features or major functionality additions
+      - tag: "[ENHANCE]"
+        description: Improvements to existing features
+      - tag: "[PERF]"
+        description: Performance optimizations and improvements
+
+    code_quality:
+      - tag: "[REFACTOR]"
+        description: Code restructuring without changing functionality
+      - tag: "[FIX]"
+        description: Bug fixes and error corrections
+      - tag: "[CLEANUP]"
+        description: Code cleanup, formatting, and minor improvements
+
+    documentation:
+      - tag: "[DOC]"
+        description: Documentation updates and additions
+      - tag: "[COMMENT]"
+        description: Code commenting and inline documentation
+
+  web_development:
+    frontend:
+      - tag: "[UI]"
+        description: User interface components and design
+      - tag: "[UX]"
+        description: User experience improvements
+      - tag: "[STYLE]"
+        description: CSS styling and visual improvements
+
+    backend_integration:
+      - tag: "[API]"
+        description: API development and endpoints
+      - tag: "[WEB]"
+        description: Web-specific functionality and integration
+      - tag: "[SERVER]"
+        description: Server setup and configuration
+
+  testing_validation:
+    - tag: "[TEST]"
+      description: Test additions and improvements
+    - tag: "[VALIDATE]"
+      description: Game rule validation and correctness checks
+
+  project_management:
+    - tag: "[CONFIG]"
+      description: Configuration files and project setup
+    - tag: "[DEPLOY]"
+      description: Deployment and production setup
+    - tag: "[INIT]"
+      description: Initial project setup and scaffolding
+
+  issue_resolution:
+    - tag: "[HOTFIX]"
+      description: Critical bug fixes requiring immediate attention
+    - tag: "[SECURITY]"
+      description: Security-related fixes and improvements
+
+  experimental_research:
+    - tag: "[EXPERIMENT]"
+      description: Experimental features and research implementations
+    - tag: "[RESEARCH]"
+      description: Research-related implementations and studies
+
+  dependencies_tools:
+    - tag: "[DEPS]"
+      description: Dependency updates and package management
+    - tag: "[TOOLS]"
+      description: Development tools and utilities
+
+usage_guidelines:
+  tag_selection_priority:
+    - Primary purpose: What is the main goal of this commit?
+    - Impact scope: Does this affect core AI, web interface, or documentation?
+    - Urgency level: Is this a hotfix, feature, or enhancement?
+  best_practices:
+    - Use at most TWO tags per commit for clarity
+    - Be specific about what changed
+    - Keep descriptions concise
+    - Use present tense
